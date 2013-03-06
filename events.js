@@ -8,7 +8,7 @@
  * 0. You just DO WHAT THE FUCK YOU WANT TO.
  */
 
-events = (function () {
+var events = (function () {
     'use strict';
 
     var addEvent = ('addEventListener' in document)?
@@ -17,9 +17,9 @@ events = (function () {
             'removeEventListener': 'detachEvent',
         
         elements = [],
-        targets = [];
+        targets  = [];
 
-    if (!Array.prototype.indexOf) {
+    if (!('indexOf' in Array.prototype)) {
         Array.prototype.indexOf = function(elt /*, from*/)   {
         var len = this.length >>> 0;
 
@@ -51,14 +51,16 @@ events = (function () {
 
         if (!target) {
             target = {
-                events: {}
+                events: {},
+                typeCount: 0
             };
-            target.events[type] = [];
+
             elements.push(element);
             targets.push(target);
         }
         if (!target.events[type]) {
             target.events[type] = [];
+            target.typeCount++;
         }
 
         if (target.events[type].indexOf(listener) === -1) {
@@ -86,22 +88,34 @@ events = (function () {
         }
 
         if (target.events[type]) {
+            var len = target.events[type].length;
 
             if (listener === 'all') {
-                for (i = 0; i < target.events[type].length; i++) {
+                for (i = 0; i < len; i++) {
                     element[removeEvent](type, target.events[type][i], useCapture || false);
                 }
-                target.events[type] = [];
+                target.events[type] = null;
+                target.typeCount--;
             } else {
-                for (i = 0; i < target.events[type].length; i++) {
+                for (i = 0; i < len; i++) {
                     if (target.events[type][i] === listener) {
-                        element[removeEvent](type, target.events[type][i], useCapture || false);
 
+                        element[removeEvent](type, target.events[type][i], useCapture || false);
                         target.events[type].splice(i, 1);
+
                         break;
                     }
                 }
             }
+            if (target.events[type] && target.events[type].length === 0) {
+                target.events[type] = null;
+                target.typeCount--;
+            }
+        }
+
+        if (!target.typeCount) {
+            targets.splice(targets.indexOf(target), 1);
+            elements.splice(elements.indexOf(element), 1);
         }
     }
 
