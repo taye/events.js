@@ -1,20 +1,26 @@
 /*
- *          DO WHAT THE FUCK YOU WANT TO PUBLIC LICENSE 
- *                  Version 2, December 2004 
- *
- *          DO WHAT THE FUCK YOU WANT TO PUBLIC LICENSE 
- * TERMS AND CONDITIONS FOR COPYING, DISTRIBUTION AND MODIFICATION 
- *
- * 0. You just DO WHAT THE FUCK YOU WANT TO.
+ * DO WHAT THE FUCK YOU WANT TO PUBLIC LICENSE
+ *                     Version 2, December 2004
+ * 
+ *  Copyright (C) 2012, 2013 Taye Adeyemi
+ * 
+ *  Everyone is permitted to copy and distribute verbatim or modified
+ *  copies of this license document, and changing it is allowed as long
+ *  as the name is changed.
+ * 
+ *             DO WHAT THE FUCK YOU WANT TO PUBLIC LICENSE
+ *    TERMS AND CONDITIONS FOR COPYING, DISTRIBUTION AND MODIFICATION
+ * 
+ *   0. You just DO WHAT THE FUCK YOU WANT TO.
  */
 
 var events = (function () {
     'use strict';
 
-    var addEvent = ('addEventListener' in document)?
-            'addEventListener': 'attachEvent',
-        removeEvent = ('removeEventListener' in document)?
-            'removeEventListener': 'detachEvent',
+    var useAttachEvent = 'attachEvent' in window && !('addEventListener' in window),
+        addEvent = !useAttachEvent?  'addEventListener': 'attachEvent',
+        removeEvent = !useAttachEvent?  'removeEventListener': 'detachEvent',
+        on = useAttachEvent? 'on': '',
         
         elements = [],
         targets  = [];
@@ -41,12 +47,25 @@ var events = (function () {
         return -1;
         };
     }
+    if (!('stopPropagation' in Event.prototype)) {
+        Event.prototype.stopPropagation = function () {
+            this.cancelBubble = true;
+        };
+        Event.prototype.stopImmediatePropagation = function () {
+            this.cancelBubble = true;
+            this.immediatePropagationStopped = true;
+        }
+    }
+    if (!('preventDefault' in Event.prototype)) {
+        Event.prototype.preventDefault = function () {
+            this.returnValue = false;
+        };
+    }
+    if (!('hasOwnProperty' in Event.prototype)) {
+        Event.prototype.hasOwnProperty = Object.prototype.hasOwnProperty;
+    }
 
     function add (element, type, listener, useCapture) {
-        if (!(element instanceof window.Element) && element !== window.document) {
-            return;
-        }
-
         var target = targets[elements.indexOf(element)];
 
         if (!target) {
@@ -58,15 +77,36 @@ var events = (function () {
             elements.push(element);
             targets.push(target);
         }
-        if (!target.events[type]) {
+
+        if (!(type in target.events)) {
             target.events[type] = [];
             target.typeCount++;
         }
 
         if (target.events[type].indexOf(listener) === -1) {
+            var ret;
+
+            if (useAttachEvent) {
+                ret = element[addEvent](on + type, function (event) {
+                    if (!event.immediatePropagationStopped) {
+                        event.target = event.srcElement;
+                        event.currentTarget = element;
+
+                        if (event.type.match(/mouse|click/)) {
+                            event.pageX = event.clientX + document.documentElement.scrollLeft;
+                            event.pageY = event.clientY + document.documentElement.scrollTop;
+                        }
+
+                        listener(event);
+                    }
+                }, listener, useCapture || false);
+            }
+            else {
+                ret = element[addEvent](type, listener, useCapture || false);
+            }
             target.events[type].push(listener);
 
-            return element[addEvent](type, listener, useCapture || false);
+            return ret;
         }
     }
 
@@ -92,7 +132,7 @@ var events = (function () {
 
             if (listener === 'all') {
                 for (i = 0; i < len; i++) {
-                    element[removeEvent](type, target.events[type][i], useCapture || false);
+                    element[removeEvent](on + type, target.events[type][i], useCapture || false);
                 }
                 target.events[type] = null;
                 target.typeCount--;
@@ -100,7 +140,7 @@ var events = (function () {
                 for (i = 0; i < len; i++) {
                     if (target.events[type][i] === listener) {
 
-                        element[removeEvent](type, target.events[type][i], useCapture || false);
+                        element[removeEvent](on + type, target.events[type][i], useCapture || false);
                         target.events[type].splice(i, 1);
 
                         break;
@@ -121,6 +161,7 @@ var events = (function () {
 
     return {
         add: add,
-        remove: remove
+        remove: remove,
+        useAttachEvent: useAttachEvent
     };
 }());
