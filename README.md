@@ -15,7 +15,7 @@ events.add(myElement, 'click', function (e) {
 The same code above works on Internet Explorer 5+ just about as you'd expect.
  - event.target === event.srcElement
  - event.currentTarget === myElement
- - event.page{X,Y} === event.client{X,Y} - document.documentElement.scroll{Left,Top}
+ - event.page{X,Y} === event.client{X,Y} + document.documentElement.scroll{Left,Top}
  - stopPropagation makes `event.cancelBubble = true`
  - stopImmediatePropagation does the same and makes `event.immediatePropagationStopped = true` and further listeners are not called
  - preventDefault makes `event.returnValue = false`
