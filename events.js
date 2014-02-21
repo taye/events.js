@@ -21,6 +21,8 @@ var events = (function () {
         addEvent = !useAttachEvent?  'addEventListener': 'attachEvent',
         removeEvent = !useAttachEvent?  'removeEventListener': 'detachEvent',
         on = useAttachEvent? 'on': '',
+
+        Event = window.Event || Object,
         
         elements = [],
         targets  = [],
