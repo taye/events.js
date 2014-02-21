@@ -55,6 +55,7 @@ var events = (function () {
         return -1;
         };
     }
+
     if (!('stopPropagation' in Event.prototype)) {
         Event.prototype.stopPropagation = function () {
             this.cancelBubble = true;
@@ -62,14 +63,17 @@ var events = (function () {
         Event.prototype.stopImmediatePropagation = function () {
             this.cancelBubble = true;
             this.immediatePropagationStopped = true;
-        }
+        };
     }
+
     if (!('preventDefault' in Event.prototype)) {
         Event.prototype.preventDefault = function () {
             this.returnValue = false;
         };
     }
+
     if (!('hasOwnProperty' in Event.prototype)) {
+        /* jshint -W001 */ // ignore warning about setting IE8 Event#hasOwnProperty
         Event.prototype.hasOwnProperty = Object.prototype.hasOwnProperty;
     }
 
