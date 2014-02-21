@@ -23,7 +23,13 @@ var events = (function () {
         on = useAttachEvent? 'on': '',
         
         elements = [],
-        targets  = [];
+        targets  = [],
+
+        attachedListeners = {
+            supplied: [],
+            wrapped:  [],
+            useCount: []
+        };
 
     if (!('indexOf' in Array.prototype)) {
         Array.prototype.indexOf = function(elt /*, from*/)   {
@@ -78,7 +84,7 @@ var events = (function () {
             targets.push(target);
         }
 
-        if (!(type in target.events)) {
+        if (!target.events[type]) {
             target.events[type] = [];
             target.typeCount++;
         }
@@ -87,19 +93,32 @@ var events = (function () {
             var ret;
 
             if (useAttachEvent) {
-                ret = element[addEvent](on + type, function (event) {
-                    if (!event.immediatePropagationStopped) {
-                        event.target = event.srcElement;
-                        event.currentTarget = element;
+                var index = attachedListeners.supplied.indexOf(listener),
 
-                        if (event.type.match(/mouse|click/)) {
-                            event.pageX = event.clientX + document.documentElement.scrollLeft;
-                            event.pageY = event.clientY + document.documentElement.scrollTop;
+                    wrapped = attachedListeners.wrapped[index] || function (event) {
+                        if (!event.immediatePropagationStopped) {
+                            event.target = event.srcElement;
+                            event.currentTarget = element;
+
+                            if (/mouse|click/.test(event.type)) {
+                                event.pageX = event.clientX + document.documentElement.scrollLeft;
+                                event.pageY = event.clientY + document.documentElement.scrollTop;
+                            }
+
+                            listener(event);
                         }
+                    };
 
-                        listener(event);
-                    }
-                }, listener, useCapture || false);
+                ret = element[addEvent](on + type, wrapped, Boolean(useCapture));
+
+                if (index === -1) {
+                    attachedListeners.supplied.push(listener);
+                    attachedListeners.wrapped.push(wrapped);
+                    attachedListeners.useCount.push(1);
+                }
+                else {
+                    attachedListeners.useCount[index]++;
+                }
             }
             else {
                 ret = element[addEvent](type, listener, useCapture || false);
@@ -112,7 +131,9 @@ var events = (function () {
 
     function remove (element, type, listener, useCapture) {
         var i,
-        target = targets[elements.indexOf(element)];
+            target = targets[elements.indexOf(element)],
+            index = attachedListeners.supplied.indexOf(listener),
+            wrapped = attachedListeners.wrapped[index] || listener;
 
         if (!target || !target.events) {
             return;
@@ -132,21 +153,28 @@ var events = (function () {
 
             if (listener === 'all') {
                 for (i = 0; i < len; i++) {
-                    element[removeEvent](on + type, target.events[type][i], useCapture || false);
+                    remove(element, type, target.events[type][i], useCapture);
                 }
-                target.events[type] = null;
-                target.typeCount--;
             } else {
                 for (i = 0; i < len; i++) {
                     if (target.events[type][i] === listener) {
-
-                        element[removeEvent](on + type, target.events[type][i], useCapture || false);
+                        element[removeEvent](on + type, wrapped, useCapture || false);
                         target.events[type].splice(i, 1);
+
+                        if (index !== -1) {
+                            attachedListeners.useCount[index]--;
+                            if (attachedListeners.useCount[index] === 0) {
+                                attachedListeners.supplied.splice(index, 1);
+                                attachedListeners.wrapped.splice(index, 1);
+                                attachedListeners.useCount.splice(index, 1);
+                            }
+                        }
 
                         break;
                     }
                 }
             }
+
             if (target.events[type] && target.events[type].length === 0) {
                 target.events[type] = null;
                 target.typeCount--;
