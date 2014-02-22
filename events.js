@@ -24,14 +24,9 @@ var events = (function () {
 
         Event = window.Event || Object,
         
-        elements = [],
-        targets  = [],
-
-        attachedListeners = {
-            supplied: [],
-            wrapped:  [],
-            useCount: []
-        };
+        elements          = [],
+        targets           = [],
+        attachedListeners = [];
 
     if (!('indexOf' in Array.prototype)) {
         Array.prototype.indexOf = function(elt /*, from*/)   {
@@ -78,7 +73,8 @@ var events = (function () {
     }
 
     function add (element, type, listener, useCapture) {
-        var target = targets[elements.indexOf(element)];
+        var elementIndex = elements.indexOf(element),
+            target = targets[elementIndex];
 
         if (!target) {
             target = {
@@ -86,8 +82,14 @@ var events = (function () {
                 typeCount: 0
             };
 
-            elements.push(element);
+            elementIndex = elements.push(element) - 1;
             targets.push(target);
+
+            attachedListeners.push((useAttachEvent ? {
+                    supplied: [],
+                    wrapped:  [],
+                    useCount: []
+                } : null));
         }
 
         if (!target.events[type]) {
@@ -99,31 +101,32 @@ var events = (function () {
             var ret;
 
             if (useAttachEvent) {
-                var index = attachedListeners.supplied.indexOf(listener),
+                var listeners = attachedListeners[elementIndex],
+                    listenerIndex = listeners.supplied.indexOf(listener);
 
-                    wrapped = attachedListeners.wrapped[index] || function (event) {
-                        if (!event.immediatePropagationStopped) {
-                            event.target = event.srcElement;
-                            event.currentTarget = element;
+                var wrapped = listeners.wrapped[listenerIndex] || function (event) {
+                    if (!event.immediatePropagationStopped) {
+                        event.target = event.srcElement;
+                        event.currentTarget = element;
 
-                            if (/mouse|click/.test(event.type)) {
-                                event.pageX = event.clientX + document.documentElement.scrollLeft;
-                                event.pageY = event.clientY + document.documentElement.scrollTop;
-                            }
-
-                            listener(event);
+                        if (/mouse|click/.test(event.type)) {
+                            event.pageX = event.clientX + document.documentElement.scrollLeft;
+                            event.pageY = event.clientY + document.documentElement.scrollTop;
                         }
-                    };
+
+                        listener(event);
+                    }
+                };
 
                 ret = element[addEvent](on + type, wrapped, Boolean(useCapture));
 
-                if (index === -1) {
-                    attachedListeners.supplied.push(listener);
-                    attachedListeners.wrapped.push(wrapped);
-                    attachedListeners.useCount.push(1);
+                if (listenerIndex === -1) {
+                    listeners.supplied.push(listener);
+                    listeners.wrapped.push(wrapped);
+                    listeners.useCount.push(1);
                 }
                 else {
-                    attachedListeners.useCount[index]++;
+                    listeners.useCount[listenerIndex]++;
                 }
             }
             else {
@@ -137,12 +140,20 @@ var events = (function () {
 
     function remove (element, type, listener, useCapture) {
         var i,
-            target = targets[elements.indexOf(element)],
-            index = attachedListeners.supplied.indexOf(listener),
-            wrapped = attachedListeners.wrapped[index] || listener;
+            elementIndex = elements.indexOf(element),
+            target = targets[elementIndex],
+            listeners,
+            listenerIndex,
+            wrapped = listener;
 
         if (!target || !target.events) {
             return;
+        }
+
+        if (useAttachEvent) {
+            listeners = attachedListeners[elementIndex];
+            listenerIndex = listeners.supplied.indexOf(listener);
+            wrapped = listeners.wrapped[listenerIndex];
         }
 
         if (type === 'all') {
@@ -159,7 +170,7 @@ var events = (function () {
 
             if (listener === 'all') {
                 for (i = 0; i < len; i++) {
-                    remove(element, type, target.events[type][i], useCapture);
+                    remove(element, type, target.events[type][i], Boolean(useCapture));
                 }
             } else {
                 for (i = 0; i < len; i++) {
@@ -167,12 +178,12 @@ var events = (function () {
                         element[removeEvent](on + type, wrapped, useCapture || false);
                         target.events[type].splice(i, 1);
 
-                        if (index !== -1) {
-                            attachedListeners.useCount[index]--;
-                            if (attachedListeners.useCount[index] === 0) {
-                                attachedListeners.supplied.splice(index, 1);
-                                attachedListeners.wrapped.splice(index, 1);
-                                attachedListeners.useCount.splice(index, 1);
+                        if (useAttachEvent && listeners) {
+                            listeners.useCount[listenerIndex]--;
+                            if (listeners.useCount[listenerIndex] === 0) {
+                                listeners.supplied.splice(listenerIndex, 1);
+                                listeners.wrapped.splice(listenerIndex, 1);
+                                listeners.useCount.splice(listenerIndex, 1);
                             }
                         }
 
@@ -188,8 +199,9 @@ var events = (function () {
         }
 
         if (!target.typeCount) {
-            targets.splice(targets.indexOf(target), 1);
-            elements.splice(elements.indexOf(element), 1);
+            targets.splice(elementIndex);
+            elements.splice(elementIndex);
+            attachedListeners.splice(elementIndex);
         }
     }
 
