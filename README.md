@@ -4,12 +4,21 @@ events.js
 Simple JavaScript events wrapper magiaclly suporting IE5+
 
 ```javascript
-events.add(document.body, 'click', function (e) { 
-    console.log(event.target);
-    console.log(event.currentTarget);
-    console.log(event.pageX, event.pageY);
-    event.stopPropagation();
-    event.preventDefault();
+function print (event) {
+    document.body.innerHTML = [
+        event.type,
+        event.pageX + ', ' + event.pageY, '<br>',
+        event.target.nodeName,
+        event.currentTarget.nodeName
+    ].join(' ');
+}
+
+events.add(document, 'mousedown', function (event) {
+    events.add(document, 'mousemove', print);
+});
+
+events.add(document, 'mouseup', function (event) {
+    events.remove(document, 'mousemove', print);
 });
 ```
 The same code above works on Internet Explorer 5-8 just about as you'd expect.
