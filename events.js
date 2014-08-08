@@ -22,58 +22,12 @@ var events = (function () {
         removeEvent = !useAttachEvent?  'removeEventListener': 'detachEvent',
         on = useAttachEvent? 'on': '',
 
-        Event = window.Event || Object,
-        
         elements          = [],
         targets           = [],
         attachedListeners = [];
 
-    if (!('indexOf' in Array.prototype)) {
-        Array.prototype.indexOf = function(elt /*, from*/)   {
-        var len = this.length >>> 0;
-
-        var from = Number(arguments[1]) || 0;
-        from = (from < 0)?
-            Math.ceil(from):
-            Math.floor(from);
-
-        if (from < 0) {
-            from += len;
-        }
-
-        for (; from < len; from++) {
-            if (from in this && this[from] === elt) {
-                return from;
-            }
-        }
-
-        return -1;
-        };
-    }
-
-    if (!('stopPropagation' in Event.prototype)) {
-        Event.prototype.stopPropagation = function () {
-            this.cancelBubble = true;
-        };
-        Event.prototype.stopImmediatePropagation = function () {
-            this.cancelBubble = true;
-            this.immediatePropagationStopped = true;
-        };
-    }
-
-    if (!('preventDefault' in Event.prototype)) {
-        Event.prototype.preventDefault = function () {
-            this.returnValue = false;
-        };
-    }
-
-    if (!('hasOwnProperty' in Event.prototype)) {
-        /* jshint -W001 */ // ignore warning about setting IE8 Event#hasOwnProperty
-        Event.prototype.hasOwnProperty = Object.prototype.hasOwnProperty;
-    }
-
     function add (element, type, listener, useCapture) {
-        var elementIndex = elements.indexOf(element),
+        var elementIndex = indexOf(elements, element),
             target = targets[elementIndex];
 
         if (!target) {
@@ -87,7 +41,7 @@ var events = (function () {
 
             attachedListeners.push((useAttachEvent ? {
                     supplied: [],
-                    wrapped:  [],
+                    wrapped : [],
                     useCount: []
                 } : null));
         }
@@ -97,17 +51,21 @@ var events = (function () {
             target.typeCount++;
         }
 
-        if (target.events[type].indexOf(listener) === -1) {
+        if (indexOf(target.events[type], listener) === -1) {
             var ret;
 
             if (useAttachEvent) {
                 var listeners = attachedListeners[elementIndex],
-                    listenerIndex = listeners.supplied.indexOf(listener);
+                    listenerIndex = indexOf(listeners.supplied, listener);
 
                 var wrapped = listeners.wrapped[listenerIndex] || function (event) {
                     if (!event.immediatePropagationStopped) {
                         event.target = event.srcElement;
                         event.currentTarget = element;
+
+                        event.preventDefault = event.preventDefault || preventDef;
+                        event.stopPropagation = event.stopPropagation || stopProp;
+                        event.stopImmediatePropagation = event.stopImmediatePropagation || stopImmProp;
 
                         if (/mouse|click/.test(event.type)) {
                             event.pageX = event.clientX + document.documentElement.scrollLeft;
@@ -140,7 +98,7 @@ var events = (function () {
 
     function remove (element, type, listener, useCapture) {
         var i,
-            elementIndex = elements.indexOf(element),
+            elementIndex = indexOf(elements, element),
             target = targets[elementIndex],
             listeners,
             listenerIndex,
@@ -152,7 +110,7 @@ var events = (function () {
 
         if (useAttachEvent) {
             listeners = attachedListeners[elementIndex];
-            listenerIndex = listeners.supplied.indexOf(listener);
+            listenerIndex = indexOf(listeners.supplied, listener);
             wrapped = listeners.wrapped[listenerIndex];
         }
 
@@ -204,6 +162,30 @@ var events = (function () {
             attachedListeners.splice(elementIndex);
         }
     }
+
+    function indexOf (array, target) {
+        for (var i = 0, len = array.length; i < len; i++) {
+            if (array[i] === target) {
+                return i;
+            }
+        }
+
+        return -1;
+    }
+
+    function preventDef () {
+        this.returnValue = false;
+    }
+
+    function stopProp () {
+        this.cancelBubble = true;
+    }
+
+    function stopImmProp () {
+        this.cancelBubble = true;
+        this.immediatePropagationStopped = true;
+    }
+
 
     return {
         add: add,
