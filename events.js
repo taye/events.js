@@ -68,8 +68,8 @@ var events = (function () {
                         event.stopImmediatePropagation = event.stopImmediatePropagation || stopImmProp;
 
                         if (/mouse|click/.test(event.type)) {
-                            event.pageX = event.clientX + document.documentElement.scrollLeft;
-                            event.pageY = event.clientY + document.documentElement.scrollTop;
+                            event.pageX = event.clientX + (document.documentElement.scrollLeft || document.body.scrollLeft);
+                            event.pageY = event.clientY + (document.documentElement.scrollTop  || document.body.scrollTop);
                         }
 
                         listener(event);
